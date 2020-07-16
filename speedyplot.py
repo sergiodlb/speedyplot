@@ -199,6 +199,7 @@ parser = argparse.ArgumentParser(description='plot somewhat arbitrary data store
 parser.add_argument('files', nargs='+', type=str, help='input files')
 parser.add_argument('--even', action='store_true', help='select only even number files in range, specified by {n1..n2} notation')
 parser.add_argument('--odd', action='store_true', help='select only odd number files in range, specified by {n1..n2} notation')
+parser.add_argument('--hysteresis', action='store_true', help='subtract every other curve')
 parser.add_argument('--header', type=int, default=1, help='number of header lines to skip', metavar='N')
 parser.add_argument('--listcols', action='store_true', help='print list of column headers or labels, if available (first file only)')
 parser.add_argument('-x', '--plotvs', type=ssints, default=[[0,]], help='column index or indices to plot against (zero-indexed)', metavar='COLS')
@@ -247,6 +248,7 @@ parser.add_argument('--xnorm', action='store_true', help='normalize x-data to ra
 parser.add_argument('--ymult', type=ssfloats, default=None, help='multiplier to scale y-axes (can be list)')
 parser.add_argument('--zeroy', action='store_true', help='shift y-data down to zero by minimum value')
 parser.add_argument('--orezy', action='store_true', help='shift y-data to zero by MAXimum value')
+parser.add_argument('--meansubtract', action='store_true', help='shift y-data down to zero by average value')
 parser.add_argument('--yshifts', type=csfloats, default=None, help='constant shifts to y-data applied after other manipulations; list or single value (creates crude waterfall plot ordered by file sequence)')
 parser.add_argument('--waterfall', nargs='?', type=float, default=False, const=1, metavar='MULT', help='toggle waterfall plot; requires two x-columns; optional value specifies multiplier for y-separation')
 parser.add_argument('--traces', type=csfloats, default=None, metavar='VALS', help='trace/linecut mode; comma list of values (from x-axis 1) along which to plot traces (vs x-axis 2)')
@@ -611,6 +613,8 @@ def main(fig=None):
                 if not args.ylabels:
                     for derivcol in [derivcol for derivcol in derivcols if derivcol in usecols]:
                         labels[derivcol] = 'derivative of {}'.format(labels[derivcol])
+#            if args.meansubtract:
+#                data_columns[:, usecols] -= np.nanmean(data_columns[:, usecols], axis=0)
             if args.integrate:
                 if type(args.integrate) is list:
                     intcols = args.integrate
@@ -710,6 +714,10 @@ def main(fig=None):
                 col -= np.nanmax(col)
                 if not args.ylabels:
                     label += ' - ymax'
+            if args.meansubtract:
+                col -= np.nanmean(col)
+                if not args.ylabels:
+                    label += ' - ymean'
             if args.yshifts:
                 if len(args.yshifts)>1:
                     col += args.yshifts[n]
@@ -718,6 +726,16 @@ def main(fig=None):
                         data[n][:, plotvs[1]] += n*args.yshifts[0]
                     else:
                         col += n*args.yshifts[0]
+            if args.hysteresis:
+                if n % 2: # odd, and therefore second file of each pair
+                    if colorplot_mode:
+                        data[n][:, usecols]   = data[n][:, usecols] - np.flip(data[n-1][:, usecols])
+                        data[n-1][:, usecols] = np.nan
+                    else:
+                        col = col - lastcol
+                else:
+                    lastcol = np.flip(col)
+                    continue
             if args.waterfall: # Waterfall plot mode
                 col += args.waterfall*ydata # separate lines by second x-value times multiplier (default 1)
             if args.traces: # trace plot mode
@@ -733,7 +751,7 @@ def main(fig=None):
                     xdata, ydata = ydata*np.sin(xdata*np.pi/180), ydata*np.cos(xdata*np.pi/180)
                     ylabel = 'parallel magnetic field (T)'
                     xlabel = 'perpendicular magnetic field (T)' 
-                if n == 0 and p == 0:
+                if (n == 0 or (args.hysteresis and n==1)) and p == 0:
                     crange = len(axes)*[()]
                     gcmin, gcmax = np.full(len(axes), np.nan), np.full(len(axes), np.nan)
                 if not args.crange:
@@ -786,6 +804,7 @@ def main(fig=None):
                         l.set_rotation(45)
                 else:
                     line = ax.plot(xdata, col, label=fname, **lineprops)
+                                  
                 # Ends up labeling based on last file in list
                 ax.set_ylabel(label)
                 if args.traces:
