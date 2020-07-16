@@ -236,7 +236,7 @@ parser.add_argument('--fold', action='store_true', help='fold negative x-values 
 parser.add_argument('--logx', action='store_true', help='use log scale on x-axis')
 parser.add_argument('--logy', action='store_true', help='use log scale on y-axis')
 parser.add_argument('--xmult', type=ssfloats, default=None, help='multiplier to scale x-axes (can be list)')
-parser.add_argument('--xshifts', type=ssfloats, default=None, help='offset to shift x-axes (can be list)')
+parser.add_argument('--xshifts', type=ssfloats, default=None, help='offset to shift x-axes (can be list; will cycle if fewer than number of files)')
 parser.add_argument('--xinvert', action='store_true', help='invert x-axis')
 parser.add_argument('--xlabel', type=str, default=None, help='manually specify x-axis label (string)')
 parser.add_argument('--ylabels', type=ssstrs, default=None, help='manually specify y-axis labels (string; semicolons for multiple axes)')
@@ -674,7 +674,12 @@ def main(fig=None):
                 if len(args.xshifts) > 1 and len(args.xshifts[0]) > 1:
                     xshifts = args.xshifts[n][p]
                 elif len(args.xshifts) > 1:
-                    xshifts = args.xshifts[n][0]
+                    if len(args.xshifts) < len(files): # cycle instead
+                        if n == 0:
+                            iterxshifts = it.cycle(args.xshifts)
+                        xshifts = next(iterxshifts) # doesn't work if there is more than one panel
+                    else:
+                        xshifts = args.xshifts[n][0]
                 elif len(args.xshifts[0]) > 1:
                     xshifts = args.xshifts[0][p]
                 else:
