@@ -93,8 +93,10 @@
 # 2019-02-06 added 'orezy' option, which essentially works like zeroy, but uses the max value
 # 2019-02-27 changed csints to allow range specification with colon-slices (e.g. colummns 1:9, or rows 100:1001)
 # 2019-03-21 added csigma option which sets colorplot crange to a multiple of the z-data standard devation around the mean
+# 2020-08-04 added 1-dimensional FFT option
+# 2020-08-05 enabled automatic tex-detection of axis labels; inserts $...$ in labels with [{}_^] in string, excluding anything in (...) at end
+#            added low-pass, high-pass, and band-pass filter options, specified by frequency (scalar for LP/HP, 2-tuple for BP) corresponding to FFT frequency domain
 #
-# * add fft
 # * add better refresh, autoupdate
 # * static panel aspect ratio
 # * quit using np array for labels; use list
@@ -102,6 +104,7 @@
 import numpy as np
 import scipy.interpolate as sci
 import scipy.integrate as scg
+import scipy.signal as scs
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as mcm
@@ -254,6 +257,10 @@ parser.add_argument('--waterfall', nargs='?', type=float, default=False, const=1
 parser.add_argument('--traces', type=csfloats, default=None, metavar='VALS', help='trace/linecut mode; comma list of values (from x-axis 1) along which to plot traces (vs x-axis 2)')
 parser.add_argument('--derivative', nargs='?', type=csints, default=False, const=True, metavar='COLS', help='columns to take derivative/central differences (wrt x-axis; can be list)')
 parser.add_argument('--integrate', nargs='?', type=csints, default=False, const=True, metavar='COLS', help='columns to integrate (cumulative trapezoidal summation wrt x-axis; can be list)')
+parser.add_argument('--fft', nargs='?', type=csints, default=False, const=True, metavar='COLS', help='columns on which to perform fast Fourier transform')
+parser.add_argument('--lpfilter', type=float, default=False, metavar='FREQ', help='perform a low-pass filter operation using the specified cutoff frequency')
+parser.add_argument('--hpfilter', type=float, default=False, metavar='FREQ', help='perform a high-pass filter operation using the specified cutoff frequency')
+parser.add_argument('--bpfilter', type=csfloats, default=False, metavar='FREQS', help='perform a band-pass filter operation between the specified cutoff frequencies')
 parser.add_argument('--invert', nargs='?', type=csints, default=False, const=True, metavar='COLS', help='columns to invert (can be list)')
 parser.add_argument('--sharey', action='store_true', help='use same y-range in all panels')
 #parser.add_argument('--delimiter', type=str, default='\t', help='delimiter separating columns')
@@ -439,6 +446,14 @@ def main(fig=None):
                 for nl, label in enumerate(labels):
                     print('{}:\t{}'.format(nl, label))
                 sys.exit(0)
+            for l, label in enumerate(labels):
+                tex = re.search('[{}_^]', label)
+                if tex:
+                    twoparts = re.fullmatch('(.+)\s(\(.+\))', label)
+                    if twoparts:
+                        labels[l] = '${}$ {}'.format(twoparts.group(1), twoparts.group(2))
+                    else:
+                        labels[l] = '${}$'.format(label)
             if args.ylabels: # replace header labels with custom labels if provided
                 if lineplot_mode:
                     #labels[usecols] = args.ylabels
@@ -624,6 +639,37 @@ def main(fig=None):
                 if not args.ylabels:
                     for intcol in [intcol for intcol in intcols if intcol in usecols]:
                         labels[intcol] = 'integral of {}'.format(labels[intcol])
+            if args.fft:
+                if type(args.fft) is list:
+                    fftcols = args.fft
+                elif args.fft is True:
+                    fftcols = usecols.copy()
+                FFT = np.fft.rfft(data_columns[:, fftcols], axis=0)
+                data_columns[:, fftcols] = np.nan
+                data_columns[:FFT.shape[0], fftcols] = FFT.real
+                FREQ = np.fft.rfftfreq(data_columns.shape[0], d=np.fabs(np.mean(np.diff(data_columns[:, plotvs[0]]))))
+                data_columns[:, plotvs[0]] = np.nan
+                data_columns[:FFT.shape[0], plotvs[0]] = FREQ
+                if not args.ylabels:
+                    for fftcol in [fftcol for fftcol in fftcols if fftcol in usecols]:
+                        labels[fftcol] = 'FFT[{}]'.format(labels[fftcol])
+                if not args.xlabel:
+                    labels[plotvs[0]] = '1 / {}'.format(labels[plotvs[0]])
+            if args.lpfilter:
+                order = 10
+                filt = scs.butter(order, args.lpfilter, btype='lowpass', output='sos', fs=1/np.fabs(np.mean(np.diff(data_columns[:, plotvs[0]]))))
+                for u in usecols:
+                    data_columns[:, u] = scs.sosfilt(filt, data_columns[:, u])
+            if args.hpfilter:
+                order = 10
+                filt = scs.butter(order, args.hpfilter, btype='highpass', output='sos', fs=1/np.fabs(np.mean(np.diff(data_columns[:, plotvs[0]]))))
+                for u in usecols:
+                    data_columns[:, u] = scs.sosfilt(filt, data_columns[:, u])
+            if args.bpfilter:
+                order = 10
+                filt = scs.butter(order, args.bpfilter, btype='bandpass', output='sos', fs=1/np.fabs(np.mean(np.diff(data_columns[:, plotvs[0]]))))
+                for u in usecols:
+                    data_columns[:, u] = scs.sosfilt(filt, data_columns[:, u])
             if args.invert is not False or args.xinvert:
                 if type(args.invert) is list:
                     invcols = args.invert
