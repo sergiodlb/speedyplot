@@ -96,7 +96,7 @@
 # 2020-08-04 added 1-dimensional FFT option
 # 2020-08-05 enabled automatic tex-detection of axis labels; inserts $...$ in labels with [{}_^] in string, excluding anything in (...) at end
 #            added low-pass, high-pass, and band-pass filter options, specified by frequency (scalar for LP/HP, 2-tuple for BP) corresponding to FFT frequency domain
-# 2020-08-12 added masknegative option to set negative y-values to NaN (will not plot)
+# 2020-08-12 added masknegative option to set negative y-values to NaN (will not plot); NaN may be set to special color for interpolated data
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -271,7 +271,7 @@ parser.add_argument('--vertical', action='store_true', help='draw subplots verti
 parser.add_argument('--horizontal', action='store_true', help='draw subplots horizontally')
 parser.add_argument('--xlim', type=csfloats, default=None, help='specified limits for x-axes')
 parser.add_argument('--ylims', type=ssfloats, default=None, help='specified limits for y-axes (can specify panel with semicolons)')
-parser.add_argument('--masknegative', action='store_true', help='mask negative values (mask as NaN) in all loaded data')
+parser.add_argument('--masknegative', nargs='?', type=str, default=False, const=True, metavar='COLOR', help='mask negative values in all loaded colormap data; can take color name for mask color if interpolated')
 parser.add_argument('--deleterows', type=csints, default=None, help='row numbers to delete (mask as NaN) in all loaded data (comma list)')
 parser.add_argument('--trimspikes', type=csints, default=None, help='column numbers to detect and remove data spikes (mask as NaN)')
 parser.add_argument('--monotonic', action='store_true', help='remove points with opposite sweep direction to the average (cuts data with non-monotonic direction in the x-variable)')
@@ -906,6 +906,11 @@ def main(fig=None):
                 Ny = int(Ny)
             gridY, gridX = np.mgrid[Y1:Y2:Ny*1j, X1:X2:Nx*1j]
 
+            # apply mask color, if supplied (only works for colormaps, not scatter)
+            if args.masknegative and args.masknegative is not True:
+                args.cmap = mcm.get_cmap(args.cmap)
+                args.cmap.set_bad(color=args.masknegative)
+
             # interpolate and plot
             cplot_props = dict(cmap=args.cmap, origin='lower', aspect='auto', interpolation='none')
             for p, (ax, usecol, clabel) in enumerate(zip(it.cycle(axes), usecols, labels[usecols])):
@@ -934,6 +939,7 @@ def main(fig=None):
                 cbar = fig.colorbar(cplot, ax=ax)
                 cbar.set_label(clabel)
                 #ax.autoscale(enable=True, axis='both', tight=True)
+    print('{} files'.format(len(files)))
 
     fig.tight_layout()
     if lineplot_mode and not args.nolegend:
