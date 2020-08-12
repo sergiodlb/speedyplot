@@ -96,6 +96,7 @@
 # 2020-08-04 added 1-dimensional FFT option
 # 2020-08-05 enabled automatic tex-detection of axis labels; inserts $...$ in labels with [{}_^] in string, excluding anything in (...) at end
 #            added low-pass, high-pass, and band-pass filter options, specified by frequency (scalar for LP/HP, 2-tuple for BP) corresponding to FFT frequency domain
+# 2020-08-12 added masknegative option to set negative y-values to NaN (will not plot)
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -270,6 +271,7 @@ parser.add_argument('--vertical', action='store_true', help='draw subplots verti
 parser.add_argument('--horizontal', action='store_true', help='draw subplots horizontally')
 parser.add_argument('--xlim', type=csfloats, default=None, help='specified limits for x-axes')
 parser.add_argument('--ylims', type=ssfloats, default=None, help='specified limits for y-axes (can specify panel with semicolons)')
+parser.add_argument('--masknegative', action='store_true', help='mask negative values (mask as NaN) in all loaded data')
 parser.add_argument('--deleterows', type=csints, default=None, help='row numbers to delete (mask as NaN) in all loaded data (comma list)')
 parser.add_argument('--trimspikes', type=csints, default=None, help='column numbers to detect and remove data spikes (mask as NaN)')
 parser.add_argument('--monotonic', action='store_true', help='remove points with opposite sweep direction to the average (cuts data with non-monotonic direction in the x-variable)')
@@ -537,6 +539,8 @@ def main(fig=None):
                 data.append(None) # need empty element for correct file counting
                 continue
 
+            if args.masknegative:
+                data_columns[:, usecols] = np.where(data_columns[:,usecols]<0, np.nan, data_columns[:,usecols])
             if args.deleterows:
                 print('deleting specified rows.. ', end='')
                 for row in args.deleterows:
