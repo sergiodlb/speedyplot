@@ -97,6 +97,7 @@
 # 2020-08-05 enabled automatic tex-detection of axis labels; inserts $...$ in labels with [{}_^] in string, excluding anything in (...) at end
 #            added low-pass, high-pass, and band-pass filter options, specified by frequency (scalar for LP/HP, 2-tuple for BP) corresponding to FFT frequency domain
 # 2020-08-12 added masknegative option to set negative y-values to NaN (will not plot); NaN may be set to special color for interpolated data
+# 2020-08-13 added np.ma.masked_invalid() for colormap plotting in data loop (for correct limits) and plotting loop; also added logz option for colormaps
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -110,7 +111,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as mcm
 from matplotlib.ticker import EngFormatter
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, LogNorm
 import itertools as it
 import argparse, os, glob, re
 import sys, datetime
@@ -239,6 +240,7 @@ parser.add_argument('--dashes', action='store_true', help='use dashes to indicat
 parser.add_argument('--fold', action='store_true', help='fold negative x-values into positive axis')
 parser.add_argument('--logx', action='store_true', help='use log scale on x-axis')
 parser.add_argument('--logy', action='store_true', help='use log scale on y-axis')
+parser.add_argument('--logz', action='store_true', help='use log scale on z-axis (color scale)')
 parser.add_argument('--xmult', type=ssfloats, default=None, help='multiplier to scale x-axes (can be list)')
 parser.add_argument('--xshifts', type=ssfloats, default=None, help='offset to shift x-axes (can be list; will cycle if fewer than number of files)')
 parser.add_argument('--xinvert', action='store_true', help='invert x-axis')
@@ -810,6 +812,9 @@ def main(fig=None):
                     crange = len(axes)*[()]
                     gcmin, gcmax = np.full(len(axes), np.nan), np.full(len(axes), np.nan)
                 if not args.crange:
+                    col = np.ma.masked_invalid(col)
+                    if args.logz:
+                        col = np.ma.masked_less_equal(col, 0)
                     cmin, cmax = np.nanmin(col), np.nanmax(col)
                     gcmin[p], gcmax[p] = np.nanmin([cmin, gcmin[p]]), np.nanmax([cmax, gcmax[p]]) # set global min/max for this panel
                     crange[p] = gcmin[p], gcmax[p] # use global upper and lower limits considering all files
@@ -890,6 +895,7 @@ def main(fig=None):
     if colorplot_mode:
         # use data from all files for 2D interpolation
         raw_data = np.concatenate([d for d in data if d is not None]) # skip empty entries (from emtpy files)
+        raw_data = np.ma.masked_invalid(raw_data)
 
         if args.interpolate and len(args.interpolate) > 1:
             # set interpolation limits
@@ -918,7 +924,7 @@ def main(fig=None):
                 if args.crange:
                     cplot_props.update(vmin=crange[p][0], vmax=crange[p][1])
                 if args.csigma:
-                    cmean, cstd = interp_data.mean(), interp_data.std()
+                    cmean, cstd = np.nanmean(interp_data), np.nanstd(interp_data)
                     cplot_props.update(vmin=cmean-args.csigma*cstd, vmax=cmean+args.csigma*cstd)
                     print('column \'{:s}\':\tmean = {:.5g}\tstddev = {:.5g}\tcrange = {:.5g} to {:.5g}'.format(clabel, cmean, cstd, cplot_props['vmin'], cplot_props['vmax']))
                 cplot = ax.imshow(interp_data, extent=(X1, X2, Y1, Y2), **cplot_props)
@@ -926,11 +932,15 @@ def main(fig=None):
                 cbar.set_label(clabel)
         else:
             cplot_props = dict(s=colorplot_marker_size, edgecolors='none')
+            if args.masknegative: # this is supposed to enable mask color in scatter plot mode
+                cplot_props['plotnonfinite'] = True
+            if args.logz:
+                cplot_props['norm'] = LogNorm()
             if args.square:
                 cplot_props['marker'] = 's'
             for p, (ax, usecol, clabel) in enumerate(zip(it.cycle(axes), usecols, labels[usecols])):
                 if args.csigma:
-                    cmean, cstd = raw_data[:, usecol].mean(), raw_data[:, usecol].std()
+                    cmean, cstd = np.nanmean(raw_data[:, usecol]), np.nanstd(raw_data[:, usecol])
                     vmin, vmax = cmean-args.csigma*cstd, cmean+args.csigma*cstd
                     print('column \'{:s}\':\tmean = {:.5g}\tstddev = {:.5g}\tcrange = {:.5g} to {:.5g}'.format(clabel, cmean, cstd, vmin, vmax))
                 else:
