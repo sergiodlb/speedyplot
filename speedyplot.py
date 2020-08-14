@@ -99,6 +99,7 @@
 # 2020-08-12 added masknegative option to set negative y-values to NaN (will not plot); NaN may be set to special color for interpolated data
 # 2020-08-13 added np.ma.masked_invalid() for colormap plotting in data loop (for correct limits) and plotting loop; also added logz option for colormaps
 #            added figure size, font size, and dpi options for making nice figures
+# 2020-08-14 added x2mult and fixed bug in xmult that applied xmult^p to xdata if more than one y-column was being plotted (one factor for each panel)
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -728,8 +729,10 @@ def main(fig=None):
                     xmult = args.xmult[n][0]
                 elif len(args.xmult[0]) > 1:
                     xmult = args.xmult[0][p]
-                else:
+                elif p == 0: # if only one multiplier provided, only multiply the x-axis data one time (otherwise it applies xmult^p)
                     xmult = args.xmult[0][0]
+                else:
+                    xmult = 1
                 xdata *= xmult
             if args.x2mult and (colorplot_mode or args.waterfall):
                 if len(args.x2mult) > 1 and len(args.x2mult[0]) > 1:
@@ -738,8 +741,10 @@ def main(fig=None):
                     x2mult = args.x2mult[n][0]
                 elif len(args.x2mult[0]) > 1:
                     x2mult = args.x2mult[0][p]
-                else:
+                elif p == 0: # if only one multiplier provided, only multiply the x2-axis data one time (otherwise it applies x2mult^p)
                     x2mult = args.x2mult[0][0]
+                else:
+                    x2mult = 1
                 ydata *= x2mult
             if args.xshifts:
                 if len(args.xshifts) > 1 and len(args.xshifts[0]) > 1:
