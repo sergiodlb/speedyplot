@@ -98,6 +98,7 @@
 #            added low-pass, high-pass, and band-pass filter options, specified by frequency (scalar for LP/HP, 2-tuple for BP) corresponding to FFT frequency domain
 # 2020-08-12 added masknegative option to set negative y-values to NaN (will not plot); NaN may be set to special color for interpolated data
 # 2020-08-13 added np.ma.masked_invalid() for colormap plotting in data loop (for correct limits) and plotting loop; also added logz option for colormaps
+#            added figure size, font size, and dpi options for making nice figures
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -282,11 +283,14 @@ parser.add_argument('--colorbyorder', nargs='?', type=str, default=False, const=
 parser.add_argument('--lw', type=float, default=None, help='override default linewidth')
 parser.add_argument('--ls', type=itstrs, default=None, help='override default linestyles (may be comma list)')
 parser.add_argument('--nolegend', action='store_true', help='toggle display of legend')
+parser.add_argument('--size', type=csfloats, default=None, metavar='WIDTH,HEIGHT', help='figure size in inches')
+parser.add_argument('--dpi', type=float, default=None, metavar='DPI', help='dpi resolution for printed figure')
+parser.add_argument('--fontsize', type=float, default=12, metavar='POINTS', help='font size for labels')
 args = parser.parse_args()
 
 # Plot settings
 mpl.rcParams['keymap.quit'] = 'q'
-mpl.rcParams['font.size'] = 12
+mpl.rcParams['font.size'] = args.fontsize
 mpl.rcParams['font.family'] = 'serif'
 mpl.rcParams['mathtext.default'] = 'regular'
 
@@ -397,6 +401,10 @@ def main(fig=None):
     fprops = dict(sharex=True)
     if args.sharey:
         fprops.update(dict(sharey=True))
+    if args.size:
+        fprops.update(dict(figsize=args.size, dpi=150))
+    if args.dpi:
+        fprops.update(dict(dpi=args.dpi))
     fig, axes = plt.subplots(n, m, **fprops)
     axes = np.atleast_1d(axes).ravel()
 
@@ -921,6 +929,8 @@ def main(fig=None):
             cplot_props = dict(cmap=args.cmap, origin='lower', aspect='auto', interpolation='none')
             for p, (ax, usecol, clabel) in enumerate(zip(it.cycle(axes), usecols, labels[usecols])):
                 interp_data = sci.griddata(raw_data[:, plotvs], raw_data[:, usecol], (gridX, gridY))
+                if args.logz:
+                    cplot_props['norm'] = LogNorm()
                 if args.crange:
                     cplot_props.update(vmin=crange[p][0], vmax=crange[p][1])
                 if args.csigma:
