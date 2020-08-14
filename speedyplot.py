@@ -243,6 +243,7 @@ parser.add_argument('--logx', action='store_true', help='use log scale on x-axis
 parser.add_argument('--logy', action='store_true', help='use log scale on y-axis')
 parser.add_argument('--logz', action='store_true', help='use log scale on z-axis (color scale)')
 parser.add_argument('--xmult', type=ssfloats, default=None, help='multiplier to scale x-axes (can be list)')
+parser.add_argument('--x2mult', type=ssfloats, default=None, help='multiplier to scale second x-axes in colorplot mode')
 parser.add_argument('--xshifts', type=ssfloats, default=None, help='offset to shift x-axes (can be list; will cycle if fewer than number of files)')
 parser.add_argument('--xinvert', action='store_true', help='invert x-axis')
 parser.add_argument('--xlabel', type=str, default=None, help='manually specify x-axis label (string)')
@@ -714,7 +715,7 @@ def main(fig=None):
 
             xdata = data[n][:, plotvs[0]].copy()
             if colorplot_mode or args.waterfall:
-                ydata = data[n][:, plotvs[1]].copy()
+                ydata = data[n][:, plotvs[1]] #.copy()
                 xdata = data[n][:, plotvs[0]] # don't use a copy; this allows xdata manipulations through to colorplot
                 col   = data[n][:, usecols[p]] # don't copy; allows direct manipulation to propogate to colorplot
             if args.traces:
@@ -730,6 +731,16 @@ def main(fig=None):
                 else:
                     xmult = args.xmult[0][0]
                 xdata *= xmult
+            if args.x2mult and (colorplot_mode or args.waterfall):
+                if len(args.x2mult) > 1 and len(args.x2mult[0]) > 1:
+                    x2mult = args.x2mult[n][p]
+                elif len(args.x2mult) > 1:
+                    x2mult = args.x2mult[n][0]
+                elif len(args.x2mult[0]) > 1:
+                    x2mult = args.x2mult[0][p]
+                else:
+                    x2mult = args.x2mult[0][0]
+                ydata *= x2mult
             if args.xshifts:
                 if len(args.xshifts) > 1 and len(args.xshifts[0]) > 1:
                     xshifts = args.xshifts[n][p]
