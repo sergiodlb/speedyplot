@@ -882,6 +882,8 @@ def main(fig=None):
                         dt0 = datetime.timedelta(days=d0.day, hours=d0.hour, minutes=d0.minute, seconds=d0.second, microseconds=d0.microsecond)
                         datetimes = [dt - dt0 for dt in datetimes]
                         ax.xaxis.set_major_formatter(mpl.dates.DateFormatter('%H:%M:%S')) # ignore dates and just plot versus elapsed time
+                        if n == 0: # don't need to print for each column
+                            print('time elapsed: {}'.format(datetimes[-1])) # can improve this later
                     datetimes = mpl.dates.date2num(datetimes)
                     line = ax.plot_date(datetimes, col, label=fname, **lineprops)
                     for l in ax.get_xticklabels():
