@@ -232,7 +232,7 @@ parser.add_argument('--symmetrize', type=csints, default=[], metavar='COLS',
 parser.add_argument('--antisymmetrize', type=csints, default=[], metavar='COLS',
         help='columns to antisymmetrize; requires rows to be symmetric about zero and equally spaced')
 parser.add_argument('--chain', action='store_true', help='chain time series plots together from multiple files')
-parser.add_argument('--line', nargs='?', type=float, default=False, const=True, help='plot solid lines (may also give linewidth)')
+parser.add_argument('--line', nargs='?', type=float, default=1, const=True, help='plot solid lines (may also give linewidth)')
 #parser.add_argument('--marker', action='store_true', help='plot using point markers')
 parser.add_argument('--marker', nargs='?', default=False, const=True, type=int, help='plot using point markers (can take number argument which changes colorplot marker size; default s=200)')
 parser.add_argument('--square', action='store_true', help='plot using square markers')
@@ -317,7 +317,7 @@ if args.marker:
     if args.marker is not True:
         lineprops['ms'] = args.marker
 else:
-    colorplot_marker_size = 200
+    colorplot_marker_size = 20
 if args.lw:
     lineprops['lw'] = args.lw # overrides mpl.rcParams['lines.linewidth']
 
