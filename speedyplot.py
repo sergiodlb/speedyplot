@@ -100,6 +100,7 @@
 # 2020-08-13 added np.ma.masked_invalid() for colormap plotting in data loop (for correct limits) and plotting loop; also added logz option for colormaps
 #            added figure size, font size, and dpi options for making nice figures
 # 2020-08-14 added x2mult and fixed bug in xmult that applied xmult^p to xdata if more than one y-column was being plotted (one factor for each panel)
+# 2020-09-27 added set_visible(False) condition for unused axes in n*m grid
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -409,6 +410,9 @@ def main(fig=None):
         fprops.update(dict(dpi=args.dpi))
     fig, axes = plt.subplots(n, m, **fprops)
     axes = np.atleast_1d(axes).ravel()
+    if ncols < n*m:
+        for ax in axes[ncols:n*m+1]:
+            ax.set_visible(False)
 
     # Create event callbacks
     fig.canvas.mpl_connect('key_press_event', on_key_press)
@@ -882,7 +886,7 @@ def main(fig=None):
                         dt0 = datetime.timedelta(days=d0.day, hours=d0.hour, minutes=d0.minute, seconds=d0.second, microseconds=d0.microsecond)
                         datetimes = [dt - dt0 for dt in datetimes]
                         ax.xaxis.set_major_formatter(mpl.dates.DateFormatter('%H:%M:%S')) # ignore dates and just plot versus elapsed time
-                        if n == 0: # don't need to print for each column
+                        if p == 0: # don't need to print for each column
                             print('time elapsed: {}'.format(datetimes[-1])) # can improve this later
                     datetimes = mpl.dates.date2num(datetimes)
                     line = ax.plot_date(datetimes, col, label=fname, **lineprops)
