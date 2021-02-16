@@ -101,6 +101,7 @@
 #            added figure size, font size, and dpi options for making nice figures
 # 2020-08-14 added x2mult and fixed bug in xmult that applied xmult^p to xdata if more than one y-column was being plotted (one factor for each panel)
 # 2020-09-27 added set_visible(False) condition for unused axes in n*m grid
+# 2021-02-16 added polynomialsubtract option to subtract an n-degree polynomial fit from each curve
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
