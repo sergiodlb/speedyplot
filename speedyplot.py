@@ -259,6 +259,7 @@ parser.add_argument('--ymult', type=ssfloats, default=None, help='multiplier to 
 parser.add_argument('--zeroy', action='store_true', help='shift y-data down to zero by minimum value')
 parser.add_argument('--orezy', action='store_true', help='shift y-data to zero by MAXimum value')
 parser.add_argument('--meansubtract', action='store_true', help='shift y-data down to zero by average value')
+parser.add_argument('--polynomialsubtract', default=False, type=int, help='subtract an n-degree polynomial background from each curve', metavar='DEGREE')
 parser.add_argument('--yshifts', type=csfloats, default=None, help='constant shifts to y-data applied after other manipulations; list or single value (creates crude waterfall plot ordered by file sequence)')
 parser.add_argument('--waterfall', nargs='?', type=float, default=False, const=1, metavar='MULT', help='toggle waterfall plot; requires two x-columns; optional value specifies multiplier for y-separation')
 parser.add_argument('--traces', type=csfloats, default=None, metavar='VALS', help='trace/linecut mode; comma list of values (from x-axis 1) along which to plot traces (vs x-axis 2)')
@@ -803,6 +804,11 @@ def main(fig=None):
                 col -= np.nanmean(col)
                 if not args.ylabels:
                     label += ' - ymean'
+            if args.polynomialsubtract:
+                polynomial = np.polyfit(xdata, col, args.polynomialsubtract)
+                col -= np.polyval(polynomial, xdata)
+                if not args.ylabels:
+                    label += ' - {:g}d polynomial fit'.format(args.polynomialsubtract)
             if args.yshifts:
                 if len(args.yshifts)>1:
                     col += args.yshifts[n]
