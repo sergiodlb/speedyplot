@@ -102,6 +102,7 @@
 # 2020-08-14 added x2mult and fixed bug in xmult that applied xmult^p to xdata if more than one y-column was being plotted (one factor for each panel)
 # 2020-09-27 added set_visible(False) condition for unused axes in n*m grid
 # 2021-02-16 added polynomialsubtract option to subtract an n-degree polynomial fit from each curve
+# 2023-02-14 added {start:stop} and {start:step:stop} syntax to options for file range specifiers
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -152,15 +153,40 @@ def file_or_glob(string):
     if os.path.isfile(string):
         fname = string
     else:
-        pattern = r'{(\d+)\.\.(\d+)}'
-        match = re.search(pattern, string)
-        if match: # use file number range
-            mgroup = match.group(1), match.group(2)
-            if int(mgroup[0]) < int(mgroup[1])+1:
-                fnum_range = range(int(mgroup[0]), int(mgroup[1])+1)
+        pattern1 = r'{(\d+)\.\.(\d+)}'
+        pattern2 = r'{(\d+):(\d+)}'
+        pattern3 = r'{(\d+):(\d+):(\d+)}'
+
+        match1 = re.search(pattern1, string)
+        match2 = re.search(pattern2, string)
+        match3 = re.search(pattern3, string)
+
+        if match1 or match2 or match3: # use file number range
+            if match1:
+                match   = match1
+                pattern = pattern1
+                mstart, mstop = map(int, match.group(1,2))
+                mstep   = 1
+                fnum_width = max(len(match.group(1)), len(match.group(2)))
+            elif match2:
+                match   = match2
+                pattern = pattern2
+                # mgroup  = match.group(1), match.group(2)
+                mstart, mstop = map(int, match.group(1,2))
+                mstep   = 1
+                fnum_width = max(len(match.group(1)), len(match.group(2)))
+            else: # step between file numbers (e.g. {0:4:12} -> 0,4,8,12)
+                match   = match3
+                pattern = pattern3
+                # mgroup  = match.group(1), match.group(3)
+                # mstep   = match.group(2) 
+                mstart, mstop, mstep = map(int, match.group(1,3,2))
+                print(mstart, mstop, mstep)
+                fnum_width = max(len(match.group(1)), len(match.group(3)))
+            if mstart < mstop+1:
+                fnum_range = range(mstart, mstop+1, mstep)
             else:
-                fnum_range = range(int(mgroup[0]), int(mgroup[1])-1, -1)
-            fnum_width = max(len(mgroup[0]), len(mgroup[1]))
+                fnum_range = range(mstart, mstop-1, -mstep)
             repl = '{{:0{}}}'.format(fnum_width)
             if args.even:
                 strings = [re.sub(pattern, repl.format(fnum), string, count=1) for fnum in fnum_range if (fnum+1) % 2]
