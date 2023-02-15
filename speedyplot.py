@@ -105,6 +105,7 @@
 # 2023-02-14 added {start:stop} and {start:step:stop} syntax to options for file range specifiers
 # 2023-02-15 fixed logz, which broke due to new matplotlib handling of vmin, vmax in colormaps where normalization is also specified --> limits are not arguments of the normalization
 #            added centeredz option which uses CenteredNorm()
+#            added --quiet mode for suppressing file name list and other file-specific details
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -238,6 +239,7 @@ parser.add_argument('--odd', action='store_true', help='select only odd number f
 parser.add_argument('--hysteresis', action='store_true', help='subtract every other curve')
 parser.add_argument('--header', type=int, default=1, help='number of header lines to skip', metavar='N')
 parser.add_argument('--listcols', action='store_true', help='print list of column headers or labels, if available (first file only)')
+parser.add_argument('--quiet', action='store_true', default=False, help='suppress printing file names and other file-specific details')
 parser.add_argument('-x', '--plotvs', type=ssints, default=[[0,]], help='column index or indices to plot against (zero-indexed)', metavar='COLS')
 parser.add_argument('-y', '--usecols', type=ssints, default=None, help='columns to plot', metavar='COLS')
 parser.add_argument('-r', '--combinecols', type=csints, default=None, help='x,y columns --> R = (x**2 + y**2)**0.5', metavar='X,Y')
@@ -452,6 +454,8 @@ def main(fig=None):
     # Load the data
     data = []
     first_file = True
+    if args.quiet:
+        print('loading files...')
     for n, (fname, plotvs, usecols) in enumerate(zip(files, it.cycle(args.plotvs), it.cycle(args.usecols))):
         with open(fname, 'r') as f:
             if args.header:
@@ -581,20 +585,24 @@ def main(fig=None):
             stdoutstr = '{}\t{} rows\t{} columns'
             if rows == 0:
                 stdoutstr += '\tskipping empty file'
-                print(stdoutstr.format(fname, rows, totcols))
+                if not args.quiet:
+                    print(stdoutstr.format(fname, rows, totcols))
                 data.append(None) # need empty element for correct file counting
                 continue
 
             if args.masknegative:
                 data_columns[:, usecols] = np.where(data_columns[:,usecols]<0, np.nan, data_columns[:,usecols])
             if args.deleterows:
-                print('deleting specified rows.. ', end='')
+                if not args.quiet:
+                    print('deleting specified rows.. ', end='')
                 for row in args.deleterows:
                     data_columns[row, usecols] = np.nan
-                print('{} rows deleted'.format(len(args.deleterows)))
+                if not args.quiet:
+                    print('{} rows deleted'.format(len(args.deleterows)))
             if args.trimspikes:
                 for trimcol in args.trimspikes:
-                    print('trimming spikes in column {}.. '.format(trimcol), end='')
+                    if not args.quiet:
+                        print('trimming spikes in column {}.. '.format(trimcol), end='')
                     def nan_get(y): # returns boolean array and function yielding indices of NaNs
                         return np.isnan(y), lambda z: z.nonzero()[0]
                     col = data_columns[:, trimcol]
@@ -607,9 +615,11 @@ def main(fig=None):
                     #plt.plot(avg, '.')
                     #plt.plot((col-avg)/avg, '-.')
                     data_columns[spikes, trimcol] = np.nan
-                    print('{} elements removed'.format(np.sum(spikes)))
+                    if not args.quiet:
+                        print('{} elements removed'.format(np.sum(spikes)))
             if args.monotonic:
-                print('clipping data with non-monotonic sweep direction.. ', end='')
+                if not args.quiet:
+                    print('clipping data with non-monotonic sweep direction.. ', end='')
                 xdata = data_columns[:, plotvs[0]]
                 direction = np.sign(np.mean(np.diff(xdata)))
                 if direction > 0:
@@ -738,7 +748,8 @@ def main(fig=None):
                     for invcol in [invcol for invcol in invcols if invcol in usecols]:
                         labels[invcol] = '1 / {}'.format(labels[invcol])
             data.append(data_columns)
-        print(stdoutstr.format(fname, rows, totcols))
+        if not args.quiet:
+            print(stdoutstr.format(fname, rows, totcols))
 
         for p, (ax, col, label) in enumerate(zip(it.cycle(axes),
                                   #data[n][:, args.usecols[:data[n].shape[1]-3]].T,
@@ -881,7 +892,8 @@ def main(fig=None):
                     cmin, cmax = np.nanmin(col), np.nanmax(col)
                     gcmin[p], gcmax[p] = np.nanmin([cmin, gcmin[p]]), np.nanmax([cmax, gcmax[p]]) # set global min/max for this panel
                     crange[p] = gcmin[p], gcmax[p] # use global upper and lower limits considering all files
-                    print('{} data ranges from approx {:.6g} to {:.6g}; global limits {:.6g} to {:.6g}'.format(clabel, cmin, cmax, *crange[p]))
+                    if not args.quiet:
+                        print('{} data ranges from approx {:.6g} to {:.6g}; global limits {:.6g} to {:.6g}'.format(clabel, cmin, cmax, *crange[p]))
                 elif n == 0:
                     if len(args.crange) > 1:
                         crange[p] = args.crange[p]
@@ -922,7 +934,8 @@ def main(fig=None):
                         datetimes = [dt - dt0 for dt in datetimes]
                         ax.xaxis.set_major_formatter(mpl.dates.DateFormatter('%H:%M:%S')) # ignore dates and just plot versus elapsed time
                         if p == 0: # don't need to print for each column
-                            print('time elapsed: {}'.format(datetimes[-1])) # can improve this later
+                            if not args.quiet:
+                                print('time elapsed: {}'.format(datetimes[-1])) # can improve this later
                     datetimes = mpl.dates.date2num(datetimes)
                     line = ax.plot_date(datetimes, col, label=fname, **lineprops)
                     for l in ax.get_xticklabels():
