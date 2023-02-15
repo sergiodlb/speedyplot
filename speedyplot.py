@@ -103,6 +103,8 @@
 # 2020-09-27 added set_visible(False) condition for unused axes in n*m grid
 # 2021-02-16 added polynomialsubtract option to subtract an n-degree polynomial fit from each curve
 # 2023-02-14 added {start:stop} and {start:step:stop} syntax to options for file range specifiers
+# 2023-02-15 fixed logz, which broke due to new matplotlib handling of vmin, vmax in colormaps where normalization is also specified --> limits are not arguments of the normalization
+#            added centeredz option which uses CenteredNorm()
 #
 # * add better refresh, autoupdate
 # * static panel aspect ratio
@@ -116,7 +118,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.cm as mcm
 from matplotlib.ticker import EngFormatter
-from matplotlib.colors import LinearSegmentedColormap, LogNorm
+from matplotlib.colors import LinearSegmentedColormap, LogNorm, Normalize, CenteredNorm
 import itertools as it
 import argparse, os, glob, re
 import sys, datetime
@@ -181,7 +183,6 @@ def file_or_glob(string):
                 # mgroup  = match.group(1), match.group(3)
                 # mstep   = match.group(2) 
                 mstart, mstop, mstep = map(int, match.group(1,3,2))
-                print(mstart, mstop, mstep)
                 fnum_width = max(len(match.group(1)), len(match.group(3)))
             if mstart < mstop+1:
                 fnum_range = range(mstart, mstop+1, mstep)
@@ -271,6 +272,7 @@ parser.add_argument('--fold', action='store_true', help='fold negative x-values 
 parser.add_argument('--logx', action='store_true', help='use log scale on x-axis')
 parser.add_argument('--logy', action='store_true', help='use log scale on y-axis')
 parser.add_argument('--logz', action='store_true', help='use log scale on z-axis (color scale)')
+parser.add_argument('--centeredz', action='store_true', help='use a centered normalized scale on z-axis (color scale)')
 parser.add_argument('--xmult', type=ssfloats, default=None, help='multiplier to scale x-axes (can be list)')
 parser.add_argument('--x2mult', type=ssfloats, default=None, help='multiplier to scale second x-axes in colorplot mode')
 parser.add_argument('--xshifts', type=ssfloats, default=None, help='offset to shift x-axes (can be list; will cycle if fewer than number of files)')
@@ -986,8 +988,14 @@ def main(fig=None):
                 interp_data = sci.griddata(raw_data[:, plotvs], raw_data[:, usecol], (gridX, gridY))
                 if args.logz:
                     cplot_props['norm'] = LogNorm()
+                elif args.centeredz:
+                    cplot_props['norm'] = CenteredNorm()
+                else:
+                    cplot_props['norm'] = Normalize()
                 if args.crange:
-                    cplot_props.update(vmin=crange[p][0], vmax=crange[p][1])
+                    # cplot_props.update(vmin=crange[p][0], vmax=crange[p][1])
+                    cplot_props['norm'].vmin = crange[p][0]
+                    cplot_props['norm'].vmax = crange[p][1]
                 if args.csigma:
                     cmean, cstd = np.nanmean(interp_data), np.nanstd(interp_data)
                     cplot_props.update(vmin=cmean-args.csigma*cstd, vmax=cmean+args.csigma*cstd)
@@ -1001,6 +1009,10 @@ def main(fig=None):
                 cplot_props['plotnonfinite'] = True
             if args.logz:
                 cplot_props['norm'] = LogNorm()
+            elif args.centeredz:
+                cplot_props['norm'] = CenteredNorm()
+            else:
+                cplot_props['norm'] = Normalize()
             if args.square:
                 cplot_props['marker'] = 's'
             for p, (ax, usecol, clabel) in enumerate(zip(it.cycle(axes), usecols, labels[usecols])):
@@ -1010,7 +1022,10 @@ def main(fig=None):
                     print('column \'{:s}\':\tmean = {:.5g}\tstddev = {:.5g}\tcrange = {:.5g} to {:.5g}'.format(clabel, cmean, cstd, vmin, vmax))
                 else:
                     vmin, vmax = crange[p][0], crange[p][1]
-                cplot = ax.scatter(raw_data[:, plotvs[0]], raw_data[:, plotvs[1]], c=raw_data[:, usecol], cmap=args.cmap, vmin=vmin, vmax=vmax, **cplot_props)
+                if args.crange:
+                    cplot_props['norm'].vmin = vmin
+                    cplot_props['norm'].vmax = vmax
+                cplot = ax.scatter(raw_data[:, plotvs[0]], raw_data[:, plotvs[1]], c=raw_data[:, usecol], cmap=args.cmap, **cplot_props)
                 cbar = fig.colorbar(cplot, ax=ax)
                 cbar.set_label(clabel)
                 #ax.autoscale(enable=True, axis='both', tight=True)
